@@ -2,10 +2,12 @@ from .imports import *
 from .metric import * 
 from .util import * 
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.neural_network import MLPClassifier
 
 __all__ = [
     'KNeighbors_multiclass_classification',
     'xgb_multiclass_classification',
+    'sklearn_multiclass_classification',
     'mlp_multilabel_classification',
     'mlp_multiclass_classification',
 ]
@@ -300,6 +302,68 @@ def xgb_multiclass_classification(
     val_y_pred = bst.predict(xg_val).astype(np.int64)
     if test_mask is not None:
         test_y_pred = bst.predict(xg_test).astype(np.int64)
+    
+    val_f1_micro = calc_f1_micro(y_pred=val_y_pred, y_true=label[val_mask])
+    val_f1_macro = calc_f1_macro(y_pred=val_y_pred, y_true=label[val_mask])
+    if test_mask is not None:
+        test_f1_micro = calc_f1_micro(y_pred=test_y_pred, y_true=label[test_mask])
+        test_f1_macro = calc_f1_macro(y_pred=test_y_pred, y_true=label[test_mask])
+    else:
+        test_f1_micro = test_f1_macro = 0.
+    
+    return {
+        'val_f1_micro': val_f1_micro,
+        'val_f1_macro': val_f1_macro,
+        'test_f1_micro': test_f1_micro,
+        'test_f1_macro': test_f1_macro,
+    }
+
+
+def sklearn_multiclass_classification(
+    feat: Union[FloatArray, FloatTensor],
+    label: Union[IntArray, IntTensor],
+    train_mask: Union[BoolArray, BoolTensor],    
+    val_mask: Union[BoolArray, BoolTensor],    
+    test_mask: Optional[Union[BoolArray, BoolTensor]] = None,
+    check_mask: bool = False,
+    max_epochs: int = 200, 
+) -> dict[str, float]:
+    if isinstance(feat, Tensor):
+        feat = feat.cpu().numpy() 
+    if isinstance(label, Tensor):
+        label = label.cpu().numpy() 
+    if isinstance(train_mask, Tensor):
+        train_mask = train_mask.cpu().numpy() 
+    if isinstance(val_mask, Tensor):
+        val_mask = val_mask.cpu().numpy() 
+    if isinstance(test_mask, Tensor):
+        test_mask = test_mask.cpu().numpy() 
+        
+    assert np.min(label) == 0 
+
+    if test_mask is None:
+        assert len(feat) == len(label) == len(train_mask) == len(val_mask)
+        
+        if check_mask:
+            assert np.all(train_mask | val_mask)
+            assert np.all(~(train_mask & val_mask))
+    else:
+        assert len(feat) == len(label) == len(train_mask) == len(val_mask) == len(test_mask)
+        
+        if check_mask:
+            assert np.all(train_mask | val_mask | test_mask)
+            assert np.all(~(train_mask & val_mask & test_mask))
+    
+    feat_dim = feat.shape[-1]
+    num_classes = np.max(label) + 1 
+    
+    clf = MLPClassifier(max_iter=max_epochs)
+
+    clf.fit(X=feat[train_mask], y=label[train_mask])    
+    
+    val_y_pred = clf.predict(feat[val_mask])
+    if test_mask is not None:
+        test_y_pred = clf.predict(feat[test_mask])
     
     val_f1_micro = calc_f1_micro(y_pred=val_y_pred, y_true=label[val_mask])
     val_f1_macro = calc_f1_macro(y_pred=val_y_pred, y_true=label[val_mask])

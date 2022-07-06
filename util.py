@@ -3,6 +3,10 @@ from .imports import *
 _device = torch.device('cpu')
 
 
+def set_cwd(path: str):
+    os.chdir(os.path.dirname(path))
+
+
 def init_log(log_path: Optional[str] = './log.log',
              stdout: bool = True):
     handlers = []
@@ -21,7 +25,10 @@ def init_log(log_path: Optional[str] = './log.log',
     )
     
     
-def log_multi(**kwargs):
+def log_multi(
+    wandb_log: bool = False,
+    **kwargs,
+):
     seps = []
     
     for key, value in kwargs.items():
@@ -33,6 +40,17 @@ def log_multi(**kwargs):
     text = ', '.join(seps)
     
     logging.info(text)
+    
+    if wandb_log:
+        if 'epoch' in kwargs:
+            epoch = kwargs.pop('epoch')
+        else:
+            epoch = None 
+        
+        wandb.log(
+            kwargs, 
+            step = epoch,
+        )
             
 
 def get_set_mapping(_set: set[Any]) -> tuple[list[Any], dict[Any, int]]:

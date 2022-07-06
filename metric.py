@@ -3,6 +3,14 @@ from sklearn.metrics import f1_score
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import accuracy_score
 
+__all__ = [
+    'calc_f1_micro',
+    'calc_f1_macro',
+    'calc_roc_auc_score',
+    'calc_acc',
+    'calc_cosine_similarity',
+]
+
 
 def convert_y_true_pred(y_true: Union[IntArray, IntTensor],
                         y_pred: Union[IntArray, IntTensor, FloatArray, FloatTensor]) -> tuple[IntArray, IntArray]:
@@ -33,41 +41,23 @@ def calc_f1_macro(y_true: Union[IntArray, IntTensor],
 
 def calc_roc_auc_score(y_true: IntArray,
                        y_pred: FloatArray) -> float:
+    raise NotImplementedError
     return roc_auc_score(y_true=y_true, y_score=y_pred)
 
 
 def calc_acc(y_true: IntArray,
              y_pred: IntArray) -> float:
+    raise NotImplementedError
     return accuracy_score(y_true=y_true, y_pred=y_pred)
 
 
-class MultiClassificationMetric:
-    def __init__(self,
-                 status: Literal['train', 'val', 'test']):
-        self.status = status 
-        self.best_f1_micro_epoch = self.best_f1_macro_epoch = -1 
-        self.best_f1_micro = self.best_f1_macro = 0.0 
+def calc_cosine_similarity(h1: FloatTensor, 
+                           h2: FloatTensor) -> FloatTensor:
+    assert h1.shape == h2.shape and h1.ndim == 2 
+                           
+    h1 = F.normalize(h1, p=2, dim=-1)
+    h2 = F.normalize(h2, p=2, dim=-1)
 
-    def measure(self,
-                epoch: int, 
-                y_true: IntArray,
-                y_pred: IntArray,
-                verbose: bool = True) -> tuple[float, float]:
-        f1_micro = calc_f1_micro(y_true=y_true, y_pred=y_pred)
-        f1_macro = calc_f1_macro(y_true=y_true, y_pred=y_pred)
-
-        if f1_micro > self.best_f1_micro:
-            self.best_f1_micro = f1_micro
-            self.best_f1_micro_epoch = epoch 
-            
-        if f1_macro > self.best_f1_macro:
-            self.best_f1_macro = f1_macro
-            self.best_f1_macro_epoch = epoch 
-        
-        if verbose:
-            logging.info(f"epoch: {epoch}, {self.status}_f1_micro: {f1_micro:.4f}, {self.status}_f1_macro: {f1_macro:.4f}")
-
-            logging.info(f"best_{self.status}_f1_micro: {self.best_f1_micro:.4f} in epoch {self.best_f1_micro_epoch}, "
-                        f"best_{self.status}_f1_macro: {self.best_f1_macro:.4f} in epoch {self.best_f1_macro_epoch}")
-
-        return f1_micro, f1_macro 
+    out = torch.mm(h1, h2.T)
+    
+    return out 
