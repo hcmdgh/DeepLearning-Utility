@@ -56,7 +56,7 @@ import torch_geometric.loader as pygloader
 import torch_geometric.utils as pygutil
 # =========================
 
-IntTensor = FloatTensor = BoolTensor = FloatScalarTensor = Tensor
+IntTensor = FloatTensor = BoolTensor = FloatScalarTensor = SparseTensor = Tensor
 IntArray = FloatArray = BoolArray = ndarray
 NodeType = str 
 EdgeType = tuple[str, str, str]
