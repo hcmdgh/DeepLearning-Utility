@@ -1,4 +1,5 @@
 from ..imports import * 
+from ..pickle_util import * 
 
 NodeType = str 
 EdgeType = tuple[str, str, str]
@@ -48,11 +49,11 @@ class HeteroGraph:
         )
 
     def save_to_file(self, file_path: str):
-        torch.save(asdict(self), file_path)
+        torch_dump(asdict(self), file_path)
         
     @classmethod
     def load_from_file(cls, file_path: str) -> 'HeteroGraph':
-        return cls(**torch.load(file_path))
+        return cls(**torch_load(file_path))
         
 
 @dataclass
@@ -87,8 +88,8 @@ class HomoGraph:
         )
 
     def save_to_file(self, file_path: str):
-        torch.save(asdict(self), file_path)
+        torch_dump(asdict(self), file_path)
         
     @classmethod
     def load_from_file(cls, file_path: str) -> 'HomoGraph':
-        return cls(**torch.load(file_path))
+        return cls(**torch_load(file_path))

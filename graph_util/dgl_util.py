@@ -1,5 +1,6 @@
 from ..imports import * 
 from .bean import * 
+from ..pickle_util import * 
 
 from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
 
