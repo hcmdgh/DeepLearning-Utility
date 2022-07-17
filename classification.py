@@ -1,6 +1,6 @@
 from .imports import * 
 from .metric import * 
-from .util import * 
+from .torch_util import * 
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.neural_network import MLPClassifier
 
@@ -17,12 +17,12 @@ def mlp_multiclass_classification(
     *,
     feat: Union[FloatArray, FloatTensor],
     label: Union[IntArray, IntTensor],
-    num_layers: Literal[1, 2] = 1, 
+    num_layers: Literal[1, 2] = 2, 
     train_mask: Union[BoolArray, BoolTensor],    
     val_mask: Union[BoolArray, BoolTensor],    
     test_mask: Optional[Union[BoolArray, BoolTensor]] = None,
     lr: float = 0.001,
-    early_stopping_epochs: int = 50,
+    num_epochs: int = 200,
     use_tqdm: bool = True,
 ) -> dict[str, Any]:
     device = get_device()
@@ -33,16 +33,17 @@ def mlp_multiclass_classification(
         label = torch.tensor(label, dtype=torch.int64, device=device)
     
     in_dim = feat.shape[-1]
-    out_dim = label.shape[-1]
-    hidden_dim = (in_dim + out_dim) // 2 
+    num_classes = int(torch.max(label)) + 1 
+    assert int(torch.min(label)) == 0
+    hidden_dim = (in_dim + num_classes) // 2 
     
     if num_layers == 1:
-        model = nn.Linear(in_dim, out_dim)
+        model = nn.Linear(in_dim, num_classes)
     elif num_layers == 2:
         model = nn.Sequential(
             nn.Linear(in_dim, hidden_dim),
             nn.ReLU(),
-            nn.Linear(hidden_dim, out_dim), 
+            nn.Linear(hidden_dim, num_classes), 
         )
     else:
         raise AssertionError 
@@ -51,17 +52,12 @@ def mlp_multiclass_classification(
     
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
-    best_dict = {
-        'epoch': 0,
-        'val_f1_micro': 0.,
-        'val_f1_macro': 0.,
-        'test_f1_micro': 0.,
-        'test_f1_macro': 0.,
-    }
+    best_val_f1_micro = 0.
+    best_val_f1_macro = 0.
+    best_test_f1_micro = 0.
+    best_test_f1_macro = 0.
     
-    bar = tqdm(itertools.count(1), disable=not use_tqdm, desc='mlp_multiclass_classification', unit='epoch')
-    
-    for epoch in bar:
+    for epoch in tqdm(range(1, num_epochs + 1), disable=not use_tqdm, desc='mlp_multiclass_classification', unit='epoch'):
         model.train() 
         
         logits = model(feat[train_mask])
@@ -94,19 +90,17 @@ def mlp_multiclass_classification(
         else:
             test_f1_micro = test_f1_macro = 0.
             
-        bar.set_description(f"val_f1_micro: {val_f1_micro:.4f}, val_f1_macro: {val_f1_macro:.4f}, test_f1_micro: {test_f1_micro:.4f}, test_f1_macro: {test_f1_macro:.4f}")
-
-        if val_f1_micro > best_dict['val_f1_micro']:
-            best_dict['epoch'] = epoch 
-            best_dict['val_f1_micro'] = val_f1_micro
-            best_dict['val_f1_macro'] = val_f1_macro 
-            best_dict['test_f1_micro'] = test_f1_micro 
-            best_dict['test_f1_macro'] = test_f1_macro 
-
-        if epoch - best_dict['epoch'] > early_stopping_epochs:
-            break 
+        best_val_f1_micro = max(best_val_f1_micro, val_f1_micro)
+        best_val_f1_macro = max(best_val_f1_macro, val_f1_macro)
+        best_test_f1_micro = max(best_test_f1_micro, test_f1_micro)
+        best_test_f1_macro = max(best_test_f1_macro, test_f1_macro)
         
-    return best_dict 
+    return {
+        'val_f1_micro': best_val_f1_micro,
+        'val_f1_macro': best_val_f1_macro,
+        'test_f1_micro': best_test_f1_micro,
+        'test_f1_macro': best_test_f1_macro,
+    } 
 
 
 def mlp_multilabel_classification(
