@@ -15,3 +15,4 @@ from .PCA import *
 from .sparse import *
 from .graph_util import *  
 from .pickle_util import * 
+from .torch_util import * 

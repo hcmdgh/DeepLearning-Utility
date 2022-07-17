@@ -1,7 +1,5 @@
 from .imports import * 
 
-_device = torch.device('cpu')
-
 
 def set_cwd(path: str):
     os.chdir(os.path.dirname(path))
@@ -64,72 +62,6 @@ class DotDict(dict):
     __getattr__ = dict.__getitem__
     __setattr__ = dict.__setitem__
     __delattr__ = dict.__delitem__
-
-
-def seed_all(seed: Optional[int]):
-    if not seed:
-        return 
-    
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    np.random.seed(seed)
-    random.seed(seed)
-    torch.backends.cudnn.benchmark = False
-    torch.backends.cudnn.deterministic = True
-    
-    dgl.seed(seed)
-    dgl.random.seed(seed)
-    
-    
-def auto_set_device(use_gpu: bool = True) -> torch.device:
-    global _device 
-
-    if not use_gpu:
-        _device = torch.device('cpu')
-        return _device
-    
-    exe_res = os.popen('gpustat --json').read() 
-    
-    state_dict = json.loads(exe_res)
-    
-    gpu_infos = [] 
-    
-    for gpu_entry in state_dict['gpus']:
-        gpu_id = int(gpu_entry['index'])
-        used_mem = int(gpu_entry['memory.used'])
-
-        gpu_infos.append((used_mem, gpu_id))
-    
-    gpu_infos.sort()
-    
-    _device = torch.device(f'cuda:{gpu_infos[0][1]}')
-    
-    return _device 
-
-
-def set_device(device_name: str):
-    global _device
-    _device = torch.device(device_name)
-    
-    
-def get_device() -> torch.device:
-    return _device 
-
-
-def to_device(obj: Any) -> Any:
-    if isinstance(obj, dict):
-        for key, value in obj.items():
-            obj[key] = to_device(value)
-
-        return obj 
-    elif isinstance(obj, list):
-        for i, value in enumerate(obj):
-            obj[i] = to_device(value)
-            
-        return obj 
-    else:
-        return obj.to(device=_device)
 
 
 def clone_module(module: nn.Module,
