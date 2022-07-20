@@ -1,4 +1,7 @@
 from .imports import * 
+from .metric import * 
+
+from io import BytesIO
 
 __all__ = [
     'seed_all',
@@ -6,9 +9,27 @@ __all__ = [
     'set_device',
     'get_device',
     'MetricRecorder',
+    'ClassificationRecorder', 
+    'is_on_cpu',
+    'is_on_gpu',
 ]
 
 _device = torch.device('cpu')
+
+
+def is_on_cpu(obj: Any) -> bool:
+    device_type = obj.device.type 
+    
+    if device_type == 'cpu':
+        return True 
+    elif device_type == 'cuda':
+        return False 
+    else:
+        raise AssertionError 
+    
+    
+def is_on_gpu(obj: Any) -> bool:
+    return not is_on_cpu(obj)
 
 
 def seed_all(seed: Optional[int]):
@@ -62,16 +83,104 @@ def get_device() -> torch.device:
     return _device 
 
 
+class ClassificationRecorder:
+    def __init__(self,
+                 log: bool = True,
+                 wandb_log: bool = True,
+                 model: Optional[nn.Module] = None):
+        self.use_log = log 
+        self.use_wandb_log = wandb_log 
+        self.model = model 
+        
+        self.best_val_acc = 0.
+        self.best_val_epoch = -1 
+        self.best_val_model_state: bytes = bytes() 
+        
+    def train(self,
+              epoch: int,
+              loss: Any):
+        loss = float(loss)
+        
+        if self.use_log:
+            logging.info(f"epoch: {epoch}, loss: {loss:.4f}")
+            
+        if self.use_wandb_log:
+            wandb.log(
+                { 'loss': loss }, 
+                step = epoch,
+            )
+    
+    def validate(self,
+                 epoch: int, 
+                 val_acc: Optional[float] = None,
+                 y_pred: Optional[FloatArrayTensor] = None,
+                 y_true: Optional[IntArrayTensor] = None):
+        if val_acc is not None and y_pred is None and y_true is None:
+            pass 
+        elif val_acc is None and y_pred is not None and y_true is not None:
+            val_acc = calc_acc(y_pred=y_pred, y_true=y_true)
+        else:
+            raise AssertionError 
+        
+        if val_acc > self.best_val_acc:
+            self.best_val_acc = val_acc 
+            self.best_val_epoch = epoch 
+            
+            if self.model is not None:
+                bio = BytesIO()
+                torch.save(self.model.state_dict(), bio)
+                self.best_val_model_state = bio.getvalue()
+        
+        if self.use_log:
+            logging.info(f"epoch: {epoch}, val_acc: {val_acc:.4f} (best: {self.best_val_acc:.4f} in epoch {self.best_val_epoch})")
+            
+        if self.use_wandb_log:
+            wandb.log(
+                { 'val_acc': val_acc }, 
+                step = epoch,
+            )
+
+    def load_best_model_state(self):
+        assert self.model is not None 
+        
+        bio = BytesIO(self.best_val_model_state)
+        self.model.load_state_dict(torch.load(bio))
+                
+    def test(self,
+             test_acc: Optional[float] = None,
+             y_pred: Optional[FloatArrayTensor] = None,
+             y_true: Optional[IntArrayTensor] = None):
+        if self.use_log:
+            logging.info(f"Use the best model (epoch: {self.best_val_epoch}, best_val_acc: {self.best_val_acc:.4f}) for testing......")
+            
+        if test_acc is not None and y_pred is None and y_true is None:
+            pass 
+        elif test_acc is None and y_pred is not None and y_true is not None:
+            test_acc = calc_acc(y_pred=y_pred, y_true=y_true)
+        else:
+            raise AssertionError
+        
+        if self.use_log:
+            logging.info(f"test_acc: {test_acc:.4f}")
+            
+        if self.use_wandb_log:
+            wandb.summary['best_val_acc'] = self.best_val_acc 
+            wandb.summary['best_val_epoch'] = self.best_val_epoch
+            wandb.summary['test_acc'] = test_acc  
+
+
 class MetricRecorder:
-    def __init__(self):
+    def __init__(self,
+                 log: bool = True,
+                 wandb_log: bool = True):
         # 第i个元素表示第i个epoch的记录
         self.record_list: list[dict[str, Any]] = [] 
+
+        self.use_log = log 
+        self.use_wandb_log = wandb_log
         
     def record(self, 
-               *,
                epoch: int,
-               log: bool = True,
-               wandb_log: bool = False,
                **metrics): 
         metrics = dict(metrics)
         
@@ -86,7 +195,7 @@ class MetricRecorder:
         self.record_list.append(metrics)
         
         # [BEGIN] log 
-        if log:
+        if self.use_log:
             seps = [f"epoch: {epoch}"]
             
             for k, v in metrics.items():
@@ -99,7 +208,7 @@ class MetricRecorder:
             
             logging.info(text)
         
-        if wandb_log:
+        if self.use_wandb_log:
             wandb.log(
                 metrics, 
                 step = epoch,
@@ -131,8 +240,6 @@ class MetricRecorder:
 
     def best_record(self,
                     field_name: str,
-                    log: bool = True,
-                    wandb_log: bool = False, 
                     min_max: Literal['min', 'max'] = 'max',) -> tuple[int, float]:
         min_val = +1e9
         max_val = -1e9
@@ -159,10 +266,10 @@ class MetricRecorder:
         else:
             raise AssertionError 
  
-        if log:
+        if self.use_log:
             logging.info(f"Best {field_name}: {best_val:.4f} in epoch {best_epoch}")
             
-        if wandb_log:
+        if self.use_wandb_log:
             wandb.summary['best_epoch'] = best_epoch 
             wandb.summary[f'best_{field_name}'] = best_val  
         

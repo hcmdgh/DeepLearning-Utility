@@ -3,12 +3,13 @@ from ..pickle_util import *
 
 NodeType = str 
 EdgeType = tuple[str, str, str]
+EdgeIndex = tuple[IntTensor, IntTensor]
 
 
 @dataclass
 class HeteroGraph:
     num_nodes_dict: dict[NodeType, int]
-    edge_index_dict: dict[EdgeType, tuple[IntTensor, IntTensor]]
+    edge_index_dict: dict[EdgeType, EdgeIndex]
     node_attr_dict: dict[str, dict[NodeType, Tensor]]
     edge_attr_dict: dict[str, dict[EdgeType, Tensor]]
     
@@ -59,7 +60,7 @@ class HeteroGraph:
 @dataclass
 class HomoGraph:
     num_nodes: int
-    edge_index: tuple[IntTensor, IntTensor]
+    edge_index: EdgeIndex
     node_attr_dict: dict[str, Tensor]
     edge_attr_dict: dict[str, Tensor]
 

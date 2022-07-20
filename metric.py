@@ -45,9 +45,10 @@ def calc_roc_auc_score(y_true: IntArray,
     return roc_auc_score(y_true=y_true, y_score=y_pred)
 
 
-def calc_acc(y_true: IntArray,
-             y_pred: IntArray) -> float:
-    raise NotImplementedError
+def calc_acc(y_true: IntArrayTensor,
+             y_pred: Union[IntArrayTensor, FloatArrayTensor]) -> float:
+    y_true, y_pred = convert_y_true_pred(y_true, y_pred)
+    
     return accuracy_score(y_true=y_true, y_pred=y_pred)
 
 

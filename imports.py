@@ -58,5 +58,6 @@ import torch_geometric.utils as pygutil
 
 IntTensor = FloatTensor = BoolTensor = FloatScalarTensor = SparseTensor = Tensor
 IntArray = FloatArray = BoolArray = ndarray
+IntArrayTensor = FloatArrayTensor = BoolArrayTensor = Union[Tensor, ndarray]
 NodeType = str 
 EdgeType = tuple[str, str, str]
